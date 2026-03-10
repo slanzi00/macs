@@ -1,0 +1,122 @@
+---
+Checks: '-*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  google-*,
+  hicpp-*,
+  llvm-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -llvm-header-guard,
+  -llvm-include-order,
+  -google-readability-todo,
+  -readability-braces-around-statements,
+  -hicpp-braces-around-statements'
+
+WarningsAsErrors: ''
+
+CheckOptions:
+  # Naming conventions
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.UnionCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypedefCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeAliasCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.MethodCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstantMemberCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MemberCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'
+  - key: readability-identifier-naming.ProtectedMemberPrefix
+    value: 'p_'
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.TemplateParameterCase
+    value: CamelCase
+
+  # Function length limits
+  - key: readability-function-size.StatementThreshold
+    value: '50'
+  - key: readability-function-size.BranchThreshold
+    value: '10'
+  - key: readability-function-size.ParameterThreshold
+    value: '5'
+  - key: readability-function-size.NestingThreshold
+    value: '4'
+
+  # Line length
+  - key: readability-function-cognitive-complexity.Threshold
+    value: '15'
+
+  # Magic numbers (puoi riabilitarlo se vuoi)
+  - key: readability-magic-numbers.IgnoredIntegerValues
+    value: '0;1;2;-1'
+  - key: readability-magic-numbers.IgnoredFloatingPointValues
+    value: '0.0;1.0;-1.0'
+
+  # Performance
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: 'true'
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: ''
+
+  # Modernize
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: modernize-use-override.IgnoreDestructors
+    value: 'false'
+  - key: modernize-loop-convert.MinConfidence
+    value: 'reasonable'
+
+  # Readability
+  - key: readability-implicit-bool-conversion.AllowPointerConditions
+    value: 'false'
+  - key: readability-implicit-bool-conversion.AllowIntegerConditions
+    value: 'false'
+  - key: readability-simplify-boolean-expr.ChainedConditionalReturn
+    value: 'true'
+  - key: readability-simplify-boolean-expr.ChainedConditionalAssignment
+    value: 'true'
+
+  # C++ Core Guidelines
+  - key: cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues
+    value: '0;1;2;-1'
+  - key: cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues
+    value: '0.0;1.0;-1.0'
+  - key: cppcoreguidelines-pro-bounds-constant-array-index.GslHeader
+    value: 'gsl/gsl'
+  - key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: 'true'

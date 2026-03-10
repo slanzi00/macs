@@ -1,0 +1,18 @@
+{
+  "lsp": {
+    "clangd": {
+      "initialization_options": {
+        "clangd.check-updates": true,
+        "fallbackFlags": ["-std=c++23", "-isystem", "/opt/homebrew/include"]
+      },
+      "binary": {
+        "path": "/usr/bin/clangd",
+        "arguments": ["--clang-tidy", "--completion-style=detailed"]
+      }
+    }
+  },
+  "code_actions_on_format": {
+    "source.fixAll": true
+  },
+  "format_on_save": "on"
+}
