@@ -19,9 +19,10 @@ stages:
   before_script:
     - apt-get update -qq
     - apt-get install -y --no-install-recommends
-        git cmake ninja-build pkg-config
+        git cmake ninja-build pkg-config make
         gcc-14 g++-14
         curl zip unzip tar ca-certificates
+        linux-libc-dev
     - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
     - update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
     - |
