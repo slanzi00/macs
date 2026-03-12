@@ -19,6 +19,9 @@ target_link_libraries(macs-run
   PRIVATE
     macs
     macs-compiler-warnings
-    cpr::cpr
-    nlohmann_json::nlohmann_json
+    bfg::lyra
+)
+
+install(TARGETS macs-run
+  RUNTIME DESTINATION bin
 )
