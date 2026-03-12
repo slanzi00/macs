@@ -1,4 +1,4 @@
-add_library(macs exfor_client.cpp)
+add_library(macs exfor_client.cpp macs_calculator.cpp)
 
 add_executable(macs-run main.cpp)
 

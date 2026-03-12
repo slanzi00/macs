@@ -21,7 +21,9 @@ Checks: '-*,
   -readability-braces-around-statements,
   -hicpp-braces-around-statements,
   -misc-use-internal-linkage,
-  -cppcoreguidelines-avoid-non-const-global-variables'
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers'
 
 WarningsAsErrors: ''
 

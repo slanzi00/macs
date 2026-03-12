@@ -1,4 +1,4 @@
-add_executable(macs-tests test_exfor_client.cpp)
+add_executable(macs-tests test_exfor_client.cpp test_macs_calculator.cpp)
 
 target_link_libraries(macs-tests
   PRIVATE
