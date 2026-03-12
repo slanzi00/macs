@@ -1,0 +1,58 @@
+default:
+  image: ubuntu:24.04
+
+variables:
+  VCPKG_ROOT: "${CI_PROJECT_DIR}/vcpkg"
+  VCPKG_DEFAULT_BINARY_CACHE: "${CI_PROJECT_DIR}/.vcpkg-cache"
+
+cache:
+  key: vcpkg-${CI_COMMIT_REF_SLUG}
+  paths:
+    - vcpkg/
+    - .vcpkg-cache/
+
+stages:
+  - build
+  - test
+
+.setup: &setup
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y --no-install-recommends
+        git cmake ninja-build pkg-config
+        gcc-14 g++-14
+        curl zip unzip tar ca-certificates
+    - update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+    - update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+    - |
+      if [ ! -f "$VCPKG_ROOT/vcpkg" ]; then
+        git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+        "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+      fi
+    - mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+build:debug:
+  <<: *setup
+  stage: build
+  script:
+    - cmake -S . -B build -G "Ninja Multi-Config"
+        -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+    - cmake --build build --config Debug
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 hour
+
+build:release:
+  <<: *setup
+  stage: build
+  script:
+    - cmake -S . -B build -G "Ninja Multi-Config"
+        -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+    - cmake --build build --config Release
+
+test:debug:
+  stage: test
+  needs: [build:debug]
+  script:
+    - ctest --test-dir build --build-config Debug --output-on-failure

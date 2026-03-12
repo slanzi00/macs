@@ -59,3 +59,6 @@ find_package(cpr REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 add_subdirectory(src)
+
+include(CTest)
+add_subdirectory(tests)
