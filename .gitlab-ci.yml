@@ -53,6 +53,7 @@ build:release:
     - cmake --build build --config Release
 
 test:debug:
+  <<: *setup
   stage: test
   needs: [build:debug]
   script:
