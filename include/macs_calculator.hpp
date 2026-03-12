@@ -9,20 +9,23 @@
 
 namespace macs {
 
-// clang-format off
-struct MeV { double value; };
-struct Barn { double value; };
-struct KeV { double value; };
-struct Millibarn { double value; };
-// clang-format on
+using CumulativeMacsRow  = std::pair<double, std::vector<double>>;
+using CumulativeMacsData = std::vector<CumulativeMacsRow>;
 
-std::expected<Millibarn, std::string> calculate_macs(std::span<MeV const> energies,
-                                                     std::span<Barn const> cross_sections,
-                                                     double atomic_mass, KeV temperature);
+// energies_mev        : energy grid [MeV]
+// cross_sections_barn : cross-section values [barn]
+// atomic_mass         : atomic mass number A
+// temperature_kev     : temperature kT [keV]
+// returns             : MACS [mb]
+std::expected<double, std::string> calculate_macs(std::span<double const> energies_mev,
+                                                  std::span<double const> cross_sections_barn,
+                                                  double atomic_mass, double temperature_kev);
 
-std::expected<std::vector<std::pair<MeV, std::vector<Millibarn>>>, std::string>
-calculate_cumulative_macs(std::span<MeV const> energies, std::span<Barn const> cross_sections,
-                          double atomic_mass, std::span<KeV const> temperatures);
+// returns: vector of (energy_mev, cumulative_macs_mb[i] for each temperature)
+std::expected<CumulativeMacsData, std::string>
+calculate_cumulative_macs(std::span<double const> energies_mev,
+                          std::span<double const> cross_sections_barn, double atomic_mass,
+                          std::span<double const> temperatures_kev);
 
 } // namespace macs
 

@@ -3,118 +3,118 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <optional>
 
 namespace {
 
-constexpr double K_B               = 8.617e-11; // Boltzmann constant [MeV/K]
-constexpr double KEV_TO_MEV        = 1e-3;      // 1 keV = 1e-3 MeV
-constexpr double BARN_TO_MILLIBARN = 1000.0;    // 1 barn = 1000 mb
-constexpr double TRAPEZOID_WEIGHT  = 0.5;       // trapezoidal rule coefficient
-constexpr double NORM_PREFACTOR    = 2.0;       // prefactor in MACS normalization
+constexpr double KEV_TO_MEV        = 1e-3;   // 1 keV = 1e-3 MeV
+constexpr double BARN_TO_MILLIBARN = 1000.0; // 1 barn = 1000 mb
 
-double trapezoid_area(auto fun, double x_1, double x_2, double y_1, double y_2)
+double thermal_energy(double temperature_kev)
 {
-  return TRAPEZOID_WEIGHT * (fun(x_1, y_1) + fun(x_2, y_2)) * (x_2 - x_1);
+  return temperature_kev * KEV_TO_MEV;
+}
+
+double macs_norm(double rmu, double kth)
+{
+  return (2.0 * rmu * rmu) / (std::sqrt(std::numbers::pi) * kth * kth);
+}
+
+double trapezoid_segment(double rmu, double kth, double en1, double cs1, double en2, double cs2)
+{
+  double const fv1 = cs1 * en1 * std::exp(-(rmu * en1) / kth);
+  double const fv2 = cs2 * en2 * std::exp(-(rmu * en2) / kth);
+  return 0.5 * (fv1 + fv2) * (en2 - en1);
+}
+
+std::optional<std::string> validate_spans(std::size_t energies_size,
+                                          std::size_t cross_sections_size)
+{
+  if (energies_size != cross_sections_size) {
+    return "energy and cross-section spans must have equal length";
+  }
+  if (energies_size == 0) {
+    return "input spans cannot be empty";
+  }
+  return std::nullopt;
+}
+
+struct ThermalParams
+{
+  std::vector<double> kths;
+  std::vector<double> norms;
+};
+
+ThermalParams precompute_thermal(std::span<double const> temperatures_kev, double rmu)
+{
+  std::vector<double> kths(temperatures_kev.size());
+  std::transform(temperatures_kev.begin(), temperatures_kev.end(), kths.begin(), thermal_energy);
+
+  std::vector<double> norms(kths.size());
+  std::transform(kths.begin(), kths.end(), norms.begin(),
+                 [rmu](double kth) { return macs_norm(rmu, kth); });
+
+  return {std::move(kths), std::move(norms)};
 }
 
 } // namespace
 
 namespace macs {
 
-std::expected<Millibarn, std::string> calculate_macs(std::span<MeV const> energies,
-                                                     std::span<Barn const> cross_sections,
-                                                     double atomic_mass, KeV temperature)
+std::expected<double, std::string> calculate_macs(std::span<double const> energies_mev,
+                                                  std::span<double const> cross_sections_barn,
+                                                  double atomic_mass, double temperature_kev)
 {
-  if (energies.size() != cross_sections.size()) {
-    return std::unexpected("energy and cross-section spans must have equal length");
+  if (auto err = validate_spans(energies_mev.size(), cross_sections_barn.size())) {
+    return std::unexpected(*err);
   }
-  if (energies.empty()) {
-    return std::unexpected("input spans cannot be empty");
-  }
-  if (temperature.value <= 0.0) {
+  if (temperature_kev <= 0.0) {
     return std::unexpected("temperature must be positive");
   }
 
-  // T[keV] → T[K] → kT[MeV]
-  double temp_k = (temperature.value * KEV_TO_MEV) / K_B; // [K]
-  double kth    = K_B * temp_k;                           // thermal energy [MeV]
-  double rmu    = atomic_mass / (1.0 + atomic_mass);      // reduced mass factor
+  double const kth = thermal_energy(temperature_kev);
+  double const rmu = atomic_mass / (1.0 + atomic_mass);
 
-  // Integrand: σ[barn] · E[MeV] · exp(−rmu·E / kT)
-  auto integrand = [rmu, kth](double e_mev, double cs_barn) {
-    return cs_barn * e_mev * std::exp(-(rmu * e_mev) / kth);
-  };
-
-  // Sum trapezoid areas over all adjacent (E, σ) pairs  [barn·MeV]
   double integral = 0.0;
-  for (std::size_t idx = 1; idx < energies.size(); ++idx) {
-    integral += trapezoid_area(integrand, energies[idx - 1].value, energies[idx].value,
-                               cross_sections[idx - 1].value, cross_sections[idx].value);
+  for (std::size_t idx = 1; idx < energies_mev.size(); ++idx) {
+    integral += trapezoid_segment(rmu, kth, energies_mev[idx - 1], cross_sections_barn[idx - 1],
+                                  energies_mev[idx], cross_sections_barn[idx]);
   }
 
-  // Normalization: 2·rmu² / (√π · kth²)  [MeV⁻²]
-  double norm = (NORM_PREFACTOR * rmu * rmu) / (std::sqrt(std::numbers::pi) * kth * kth);
-
-  // norm [MeV⁻²] · integral [barn·MeV] → [barn] → [mb]
-  return Millibarn{norm * integral * BARN_TO_MILLIBARN};
+  return macs_norm(rmu, kth) * integral * BARN_TO_MILLIBARN;
 }
 
-std::expected<std::vector<std::pair<MeV, std::vector<Millibarn>>>, std::string>
-calculate_cumulative_macs(std::span<MeV const> energies, std::span<Barn const> cross_sections,
-                          double atomic_mass, std::span<KeV const> temperatures)
+std::expected<CumulativeMacsData, std::string>
+calculate_cumulative_macs(std::span<double const> energies_mev,
+                          std::span<double const> cross_sections_barn, double atomic_mass,
+                          std::span<double const> temperatures_kev)
 {
-  if (energies.size() != cross_sections.size()) {
-    return std::unexpected("energy and cross-section spans must have equal length");
-  }
-  if (energies.empty()) {
-    return std::unexpected("input spans cannot be empty");
+  if (auto err = validate_spans(energies_mev.size(), cross_sections_barn.size())) {
+    return std::unexpected(*err);
   }
 
-  double rmu = atomic_mass / (1.0 + atomic_mass); // reduced mass factor
+  double const rmu          = atomic_mass / (1.0 + atomic_mass);
+  auto const thermal        = precompute_thermal(temperatures_kev, rmu);
+  std::size_t const n_pts   = energies_mev.size();
+  std::size_t const n_temps = temperatures_kev.size();
 
-  // Precompute thermal energies kT[MeV] and normalization factors for each temperature
-  std::vector<double> kths(temperatures.size());
-  std::transform(temperatures.begin(), temperatures.end(), kths.begin(), [](KeV tmp) {
-    double t_k = (tmp.value * KEV_TO_MEV) / K_B; // keV → K
-    return K_B * t_k;                            // K → kT [MeV]
-  });
-
-  std::vector<double> norms(temperatures.size());
-  std::transform(kths.begin(), kths.end(), norms.begin(), [rmu](double kth) {
-    return (NORM_PREFACTOR * rmu * rmu) / (std::sqrt(std::numbers::pi) * kth * kth);
-  });
-
-  std::size_t n_pts   = energies.size();
-  std::size_t n_temps = temperatures.size();
-
-  // running[t] accumulates the trapezoidal sum for temperature t  [barn·MeV]
   std::vector<double> running(n_temps, 0.0);
-  std::vector<std::pair<MeV, std::vector<Millibarn>>> rows;
+  CumulativeMacsData rows;
   rows.reserve(n_pts);
+  rows.emplace_back(energies_mev[0], std::vector<double>(n_temps, 0.0));
 
-  // First point: partial integral from 0 to E[0] is 0
-  rows.emplace_back(energies[0], std::vector<Millibarn>(n_temps, Millibarn{0.0}));
-
-  // Sequential: each step accumulates into running[], so no parallelism here
   for (std::size_t idx = 1; idx < n_pts; ++idx) {
-    double en1 = energies[idx - 1].value;
-    double en2 = energies[idx].value;
-    double cs1 = cross_sections[idx - 1].value;
-    double cs2 = cross_sections[idx].value;
-
     for (std::size_t tid = 0; tid < n_temps; ++tid) {
-      double kth = kths[tid];
-      double fv1 = cs1 * en1 * std::exp(-(rmu * en1) / kth);
-      double fv2 = cs2 * en2 * std::exp(-(rmu * en2) / kth);
-      running[tid] += TRAPEZOID_WEIGHT * (fv1 + fv2) * (en2 - en1);
+      running[tid] += trapezoid_segment(rmu, thermal.kths[tid], energies_mev[idx - 1],
+                                        cross_sections_barn[idx - 1], energies_mev[idx],
+                                        cross_sections_barn[idx]);
     }
 
-    std::vector<Millibarn> cum(n_temps);
-    std::transform(
-        norms.begin(), norms.end(), running.begin(), cum.begin(),
-        [](double norm, double acc) { return Millibarn{norm * acc * BARN_TO_MILLIBARN}; });
+    std::vector<double> cum(n_temps);
+    std::transform(thermal.norms.begin(), thermal.norms.end(), running.begin(), cum.begin(),
+                   [](double norm, double acc) { return norm * acc * BARN_TO_MILLIBARN; });
 
-    rows.emplace_back(energies[idx], std::move(cum));
+    rows.emplace_back(energies_mev[idx], std::move(cum));
   }
 
   return rows;

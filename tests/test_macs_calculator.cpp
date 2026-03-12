@@ -10,18 +10,17 @@
 
 namespace {
 
-using ConstantCsGrid = std::pair<std::vector<macs::MeV>, std::vector<macs::Barn>>;
+using CsGrid = std::pair<std::vector<double>, std::vector<double>>;
 
 // Build a uniform energy grid [e_min, e_max] with n_pts points,
 // all with constant cross-section cs_barn.
-ConstantCsGrid make_constant_cs(double e_min_mev, double e_max_mev, std::size_t n_pts,
-                                double cs_barn)
+CsGrid make_constant_cs(double e_min_mev, double e_max_mev, std::size_t n_pts, double cs_barn)
 {
-  std::vector<macs::MeV> energies(n_pts);
-  std::vector<macs::Barn> cross_sections(n_pts, macs::Barn{cs_barn});
-  double step = (e_max_mev - e_min_mev) / static_cast<double>(n_pts - 1);
+  std::vector<double> energies(n_pts);
+  std::vector<double> cross_sections(n_pts, cs_barn);
+  double const step = (e_max_mev - e_min_mev) / static_cast<double>(n_pts - 1);
   for (std::size_t idx = 0; idx < n_pts; ++idx) {
-    energies[idx] = macs::MeV{e_min_mev + (static_cast<double>(idx) * step)};
+    energies[idx] = e_min_mev + static_cast<double>(idx) * step;
   }
   return {std::move(energies), std::move(cross_sections)};
 }
@@ -32,49 +31,43 @@ TEST_SUITE("calculate_macs: error handling")
 {
   TEST_CASE("empty spans return error")
   {
-    auto res = macs::calculate_macs({}, {}, 166.0, macs::KeV{30.0});
-    CHECK_FALSE(res.has_value());
+    CHECK_FALSE(macs::calculate_macs({}, {}, 166.0, 30.0).has_value());
   }
 
   TEST_CASE("mismatched spans return error")
   {
-    std::vector<macs::MeV> energies        = {macs::MeV{0.001}, macs::MeV{0.002}};
-    std::vector<macs::Barn> cross_sections = {macs::Barn{1.0}};
-    auto res = macs::calculate_macs(energies, cross_sections, 166.0, macs::KeV{30.0});
-    CHECK_FALSE(res.has_value());
+    std::vector<double> energies       = {0.001, 0.002};
+    std::vector<double> cross_sections = {1.0};
+    CHECK_FALSE(macs::calculate_macs(energies, cross_sections, 166.0, 30.0).has_value());
   }
 
   TEST_CASE("zero temperature returns error")
   {
-    std::vector<macs::MeV> energies        = {macs::MeV{0.001}, macs::MeV{0.002}};
-    std::vector<macs::Barn> cross_sections = {macs::Barn{1.0}, macs::Barn{1.0}};
-    auto res = macs::calculate_macs(energies, cross_sections, 166.0, macs::KeV{0.0});
-    CHECK_FALSE(res.has_value());
+    std::vector<double> energies       = {0.001, 0.002};
+    std::vector<double> cross_sections = {1.0, 1.0};
+    CHECK_FALSE(macs::calculate_macs(energies, cross_sections, 166.0, 0.0).has_value());
   }
 
   TEST_CASE("negative temperature returns error")
   {
-    std::vector<macs::MeV> energies        = {macs::MeV{0.001}, macs::MeV{0.002}};
-    std::vector<macs::Barn> cross_sections = {macs::Barn{1.0}, macs::Barn{1.0}};
-    auto res = macs::calculate_macs(energies, cross_sections, 166.0, macs::KeV{-1.0});
-    CHECK_FALSE(res.has_value());
+    std::vector<double> energies       = {0.001, 0.002};
+    std::vector<double> cross_sections = {1.0, 1.0};
+    CHECK_FALSE(macs::calculate_macs(energies, cross_sections, 166.0, -1.0).has_value());
   }
 }
 
 TEST_SUITE("calculate_macs: analytical")
 {
   // For constant σ = C barn over [0, ∞]:
-  //   MACS = 2C/√π  barn  ≈ 1128.38 mb  for C = 1 barn
-  //   This result is independent of temperature and atomic mass.
+  //   MACS = 2000·C/√π  mb  (independent of temperature and atomic mass)
   //
   // Derivation:
-  //   integral = ∫₀^∞ C · E · exp(-rmu·E/kT) dE = C · (kT/rmu)²
+  //   integral = C · (kT/rmu)²
   //   norm     = 2·rmu² / (√π · kT²)
   //   MACS     = norm · integral · 1000 = 2000·C/√π  mb
 
   TEST_CASE("constant sigma = 1 barn gives 2000/sqrt(pi) mb at all temperatures")
   {
-    // Fine grid from 1e-6 to 2 MeV — spans all relevant energies for 8–90 keV temperatures
     constexpr double SIGMA_BARN = 1.0;
     double const EXPECTED       = 2000.0 * SIGMA_BARN / std::sqrt(std::numbers::pi);
     constexpr double TOL        = 0.001; // 0.1%
@@ -83,9 +76,9 @@ TEST_SUITE("calculate_macs: analytical")
     auto [energies, cross_sections] = make_constant_cs(1e-6, 2.0, N_PTS, SIGMA_BARN);
 
     for (double temp_kev : {8.0, 25.0, 30.0, 90.0}) {
-      auto res = macs::calculate_macs(energies, cross_sections, 166.0, macs::KeV{temp_kev});
+      auto res = macs::calculate_macs(energies, cross_sections, 166.0, temp_kev);
       REQUIRE(res.has_value());
-      CHECK(res->value == doctest::Approx(EXPECTED).epsilon(TOL));
+      CHECK(*res == doctest::Approx(EXPECTED).epsilon(TOL));
     }
   }
 
@@ -96,12 +89,12 @@ TEST_SUITE("calculate_macs: analytical")
     auto [energies_1, cs_1] = make_constant_cs(1e-6, 2.0, N_PTS, 1.0);
     auto [energies_2, cs_2] = make_constant_cs(1e-6, 2.0, N_PTS, 2.0);
 
-    auto res_1 = macs::calculate_macs(energies_1, cs_1, 166.0, macs::KeV{30.0});
-    auto res_2 = macs::calculate_macs(energies_2, cs_2, 166.0, macs::KeV{30.0});
+    auto res_1 = macs::calculate_macs(energies_1, cs_1, 166.0, 30.0);
+    auto res_2 = macs::calculate_macs(energies_2, cs_2, 166.0, 30.0);
 
     REQUIRE(res_1.has_value());
     REQUIRE(res_2.has_value());
-    CHECK(res_2->value == doctest::Approx(2.0 * res_1->value).epsilon(1e-9));
+    CHECK(*res_2 == doctest::Approx(2.0 * *res_1).epsilon(1e-9));
   }
 }
 
@@ -135,6 +128,7 @@ TEST_SUITE("calculate_macs: Er-166(n,g) benchmarks [.integration]")
 
   constexpr double ATOMIC_MASS = 166.0;
   constexpr double TOL         = 0.01; // 1%
+  constexpr double EV_TO_MEV   = 1e-6; // API returns eV
 
   TEST_CASE("ENDF/B-VIII.1")
   {
@@ -144,19 +138,19 @@ TEST_SUITE("calculate_macs: Er-166(n,g) benchmarks [.integration]")
     REQUIRE_FALSE(data->datasets.empty());
 
     auto const& pts = data->datasets[0].points;
-    std::vector<macs::MeV> energies(pts.size());
-    std::vector<macs::Barn> cross_sections(pts.size());
+    std::vector<double> energies(pts.size());
+    std::vector<double> cross_sections(pts.size());
     for (std::size_t idx = 0; idx < pts.size(); ++idx) {
-      energies[idx]       = macs::MeV{pts[idx].energy * 1e-6}; // eV → MeV
-      cross_sections[idx] = macs::Barn{pts[idx].cross_section};
+      energies[idx]       = pts[idx].energy * EV_TO_MEV;
+      cross_sections[idx] = pts[idx].cross_section;
     }
 
     for (auto [temp_kev, expected] :
          {std::pair{8.0, b_m.macs_8kev}, std::pair{25.0, b_m.macs_25kev},
           std::pair{30.0, b_m.macs_30kev}, std::pair{90.0, b_m.macs_90kev}}) {
-      auto res = macs::calculate_macs(energies, cross_sections, ATOMIC_MASS, macs::KeV{temp_kev});
+      auto res = macs::calculate_macs(energies, cross_sections, ATOMIC_MASS, temp_kev);
       REQUIRE(res.has_value());
-      CHECK(res->value == doctest::Approx(expected).epsilon(TOL));
+      CHECK(*res == doctest::Approx(expected).epsilon(TOL));
     }
   }
 }
