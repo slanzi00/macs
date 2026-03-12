@@ -1,0 +1,4 @@
+{
+  "name": "macs",
+  "dependencies": ["bfgroup-lyra", "doctest", "spdlog", "cpr", "nlohmann-json"]
+}

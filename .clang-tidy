@@ -16,9 +16,12 @@ Checks: '-*,
   -modernize-use-trailing-return-type,
   -llvm-header-guard,
   -llvm-include-order,
+  -llvm-prefer-static-over-anonymous-namespace,
   -google-readability-todo,
   -readability-braces-around-statements,
-  -hicpp-braces-around-statements'
+  -hicpp-braces-around-statements,
+  -misc-use-internal-linkage,
+  -cppcoreguidelines-avoid-non-const-global-variables'
 
 WarningsAsErrors: ''
 

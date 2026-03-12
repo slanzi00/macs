@@ -1,31 +1,61 @@
-cmake_minimum_required(VERSION 3.15)
-project(macs VERSION 1.0.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.20...3.28)
 
-# Set C++ standard
+if (NOT DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  message(FATAL_ERROR "You must set VCPKG_ROOT env variable or pass CMAKE_TOOLCHAIN_FILE")
+endif()
+
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+endif()
+
+project(MACS
+  VERSION 1.0
+  LANGUAGES CXX
+)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+add_library(macs-compiler-warnings INTERFACE)
+target_compile_options(macs-compiler-warnings INTERFACE
+  -Wall -Wextra -Wpedantic
+  -Wconversion -Wsign-conversion
+  -Wcast-qual -Wformat=2 -Wundef
+  -Werror=float-equal
+  -Wcast-align -Wunused
+  -Wnull-dereference -Wdouble-promotion
+  -Wimplicit-fallthrough -Wextra-semi
+  -Woverloaded-virtual
+  -Wold-style-cast
+)
 
-# Set output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+option(MACS_SANITIZE_ADDRESS   "Enable address sanitizer")
+option(MACS_SANITIZE_UNDEFINED "Enable undefined-behaviour sanitizer")
+option(MACS_SANITIZE_THREAD    "Enable thread sanitizer")
 
-# Find libcurl
-find_package(CURL REQUIRED)
+add_library(macs-sanitizers INTERFACE)
 
-# Find nlohmann_json
-find_package(nlohmann_json 3.2.0 REQUIRED)
+if (MACS_SANITIZE_ADDRESS)
+  target_compile_options(macs-sanitizers INTERFACE -fsanitize=address -fno-omit-frame-pointer)
+  target_link_options(macs-sanitizers INTERFACE -fsanitize=address -fno-omit-frame-pointer)
+endif()
 
-# Include directories
-include_directories(${CMAKE_SOURCE_DIR}/include)
-include_directories(${CURL_INCLUDE_DIRS})
+if (MACS_SANITIZE_UNDEFINED)
+  target_compile_options(macs-sanitizers INTERFACE -fsanitize=undefined -fno-omit-frame-pointer)
+  target_link_options(macs-sanitizers INTERFACE -fsanitize=undefined -fno-omit-frame-pointer)
+endif()
 
-# Add subdirectories
+if (MACS_SANITIZE_THREAD)
+  target_compile_options(macs-sanitizers INTERFACE -fsanitize=thread -fno-omit-frame-pointer)
+  target_link_options(macs-sanitizers INTERFACE -fsanitize=thread -fno-omit-frame-pointer)
+endif()
+
+find_package(lyra REQUIRED)
+find_package(doctest REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(cpr REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
 add_subdirectory(src)
-add_subdirectory(tests)
-
-# Enable testing
-enable_testing()
