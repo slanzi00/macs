@@ -112,5 +112,8 @@ jobs:
           name: build-debug
           path: build/
 
+      - name: Fix permissions
+        run: chmod +x build/tests/Debug/macs-tests
+
       - name: Run tests
         run: ctest --test-dir build --build-config Debug --output-on-failure
