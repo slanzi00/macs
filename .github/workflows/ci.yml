@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+
+jobs:
+  build-debug:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            git cmake ninja-build pkg-config make \
+            gcc-14 g++-14 \
+            curl zip unzip tar ca-certificates \
+            linux-libc-dev
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg/
+            .vcpkg-cache/
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Bootstrap vcpkg
+        run: |
+          if [ ! -f "$VCPKG_ROOT/vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+            "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Build (Debug)
+        run: |
+          cmake -S . -B build -G "Ninja Multi-Config" \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          cmake --build build --config Debug
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-debug
+          path: build/
+          retention-days: 1
+
+  build-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            git cmake ninja-build pkg-config make \
+            gcc-14 g++-14 \
+            curl zip unzip tar ca-certificates \
+            linux-libc-dev
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg/
+            .vcpkg-cache/
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Bootstrap vcpkg
+        run: |
+          if [ ! -f "$VCPKG_ROOT/vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+            "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          fi
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Build (Release)
+        run: |
+          cmake -S . -B build -G "Ninja Multi-Config" \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          cmake --build build --config Release
+
+  test-debug:
+    runs-on: ubuntu-24.04
+    needs: build-debug
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            cmake ca-certificates
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-debug
+          path: build/
+
+      - name: Run tests
+        run: ctest --test-dir build --build-config Debug --output-on-failure
