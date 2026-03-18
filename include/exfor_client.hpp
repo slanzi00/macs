@@ -1,13 +1,7 @@
 #ifndef MACS_EXFOR_CLIENT_HPP
 #define MACS_EXFOR_CLIENT_HPP
 
-#include <cstdint>
-#include <expected>
-#include <string>
-#include <string_view>
-#include <vector>
-
-namespace macs {
+namespace macs{
 
 struct Section
 {

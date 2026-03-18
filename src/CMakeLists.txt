@@ -1,4 +1,4 @@
-add_library(macs exfor_client.cpp macs_calculator.cpp)
+add_library(macs exfor_client.cpp)
 
 add_executable(macs-run main.cpp)
 
@@ -10,6 +10,7 @@ target_link_libraries(macs
   PRIVATE
     macs-compiler-warnings
     macs-sanitizers
+    macs-coverage
     spdlog::spdlog
     cpr::cpr
     nlohmann_json::nlohmann_json
@@ -19,7 +20,7 @@ target_link_libraries(macs-run
   PRIVATE
     macs
     macs-compiler-warnings
-    bfg::lyra
+    spdlog::spdlog
 )
 
 install(TARGETS macs-run
