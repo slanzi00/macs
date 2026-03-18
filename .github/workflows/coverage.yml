@@ -69,6 +69,12 @@ jobs:
       - name: Generate coverage report
         run: cmake --build build --target coverage --config Debug
 
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: build/coverage.xml
+          fail_ci_if_error: true
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

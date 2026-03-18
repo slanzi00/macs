@@ -93,6 +93,7 @@ if (MACS_COVERAGE)
       --exclude-unreachable-branches
       --exclude-throw-branches
       --html-details ${CMAKE_BINARY_DIR}/coverage/index.html
+      --cobertura ${CMAKE_BINARY_DIR}/coverage.xml
       --print-summary
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMENT "Generating coverage report → build/coverage/index.html"
@@ -108,4 +109,4 @@ find_package(nlohmann_json REQUIRED)
 add_subdirectory(src)
 
 include(CTest)
-# add_subdirectory(tests)
+add_subdirectory(tests)
