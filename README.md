@@ -1,5 +1,7 @@
 # macs
 
+[![codecov](https://codecov.io/gh/slanzi00/macs/graph/badge.svg)](https://codecov.io/gh/slanzi00/macs)
+
 Command-line tool to compute **Maxwellian-Averaged Cross Sections (MACS)** for astrophysical nucleosynthesis studies. Cross-section data is fetched live from the [IAEA EXFOR](https://www-nds.iaea.org/exfor/) nuclear database.
 
 ## Physics background
