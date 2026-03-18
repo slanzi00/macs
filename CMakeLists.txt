@@ -75,12 +75,15 @@ if (MACS_COVERAGE)
 
   find_program(GCOVR gcovr)
   if (NOT GCOVR)
-    message(WARNING "gcovr not found — install it with: pip install gcovr")
+    message(WARNING "gcovr not found — install it with: brew install gcovr / pip install gcovr")
   endif()
+
+  set(MACS_GCOV_EXECUTABLE "gcov" CACHE STRING "gcov executable to use with gcovr")
 
   add_custom_target(coverage
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/coverage
     COMMAND ${GCOVR}
+      --gcov-executable ${MACS_GCOV_EXECUTABLE}
       --root ${PROJECT_SOURCE_DIR}
       --filter ${PROJECT_SOURCE_DIR}/src/
       --filter ${PROJECT_SOURCE_DIR}/include/
