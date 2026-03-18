@@ -26,15 +26,13 @@ auto parse_exfor_sections(nlohmann::json const& json)
   return sections;
 }
 
-auto parse_cross_section(nlohmann::json const& json)
-    -> std::expected<CrossSection, ExforParseError>
+auto parse_cross_section(nlohmann::json const& json) -> std::expected<CrossSection, ExforParseError>
 {
   CrossSection xsec;
   try {
     for (auto const& point : json.at("datasets").at(0).at("pts")) {
       xsec.push_back({
-          point.at("E").get<double>(),
-          point.at("Sig").get<double>(),
+          point.at("E").get<double>(), point.at("Sig").get<double>(),
           point.value("dSig", 0.0), // not present in all datasets
       });
     }
@@ -64,8 +62,7 @@ auto http_get(std::string const& url) -> cpr::Response
   return resp;
 }
 
-auto http_get_json(std::string const& url)
-    -> std::expected<nlohmann::json, macs::ExforParseError>
+auto http_get_json(std::string const& url) -> std::expected<nlohmann::json, macs::ExforParseError>
 {
   auto resp = http_get(url);
   if (resp.status_code != HTTP_OK) {
@@ -79,7 +76,6 @@ auto http_get_json(std::string const& url)
     return std::unexpected(macs::ExforParseError::wrong_type);
   }
 }
-
 // GCOV_EXCL_STOP
 
 } // namespace
@@ -95,7 +91,9 @@ namespace macs {
       std::format("https://www-nds.iaea.org/exfor/e4list?Target={}&Reaction={}&Quantity={}&json",
                   target, reaction, quantity);
   auto json = http_get_json(url);
-  if (!json) return std::unexpected(json.error());
+  if (!json) {
+    return std::unexpected(json.error());
+  }
   return detail::parse_exfor_sections(*json);
 }
 
@@ -104,7 +102,9 @@ namespace macs {
     -> std::expected<CrossSection, ExforParseError>
 {
   auto sections = fetch_exfor_sections(target, reaction, "SIG");
-  if (!sections) return std::unexpected(sections.error());
+  if (!sections) {
+    return std::unexpected(sections.error());
+  }
 
   auto itr = std::ranges::find_if(
       *sections, [&](ExforSection const& sec) { return sec.lib_name == lib_name; });
@@ -113,10 +113,12 @@ namespace macs {
     return std::unexpected(ExforParseError::missing_field);
   }
 
-  auto url = std::format("https://www-nds.iaea.org/exfor/e4sig?SectID={}&PenSectID={}&json",
-                         itr->sect_id, itr->pen_sect_id);
+  auto url  = std::format("https://www-nds.iaea.org/exfor/e4sig?SectID={}&PenSectID={}&json",
+                          itr->sect_id, itr->pen_sect_id);
   auto json = http_get_json(url);
-  if (!json) return std::unexpected(json.error());
+  if (!json) {
+    return std::unexpected(json.error());
+  }
   return detail::parse_cross_section(*json);
 }
 

@@ -49,12 +49,8 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
           cmake --build build --config Debug
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-debug
-          path: build/
-          retention-days: 1
+      - name: Run tests
+        run: ctest --test-dir build --build-config Debug --output-on-failure
 
   build-release:
     runs-on: ubuntu-24.04
