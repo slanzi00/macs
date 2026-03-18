@@ -24,7 +24,8 @@ Checks: '-*,
   -cppcoreguidelines-avoid-non-const-global-variables,
   -readability-magic-numbers,
   -cppcoreguidelines-avoid-magic-numbers,
-  -readability-identifier-naming'
+  -readability-identifier-naming,
+  -bugprone-easily-swappable-parameters'
 
 WarningsAsErrors: ''
 
