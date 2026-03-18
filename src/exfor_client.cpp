@@ -5,42 +5,46 @@
 #include <spdlog/spdlog.h>
 
 #include <format>
+#include <ranges>
 
 namespace macs::detail {
 
 auto parse_exfor_sections(nlohmann::json const& json)
     -> std::expected<ExforSections, ExforParseError>
 {
-  ExforSections sections;
   try {
-    for (auto const& sec : json.at("sections")) {
-      sections.emplace_back(sec.at("Targ").get<std::string>(), sec.at("AT").get<std::uint32_t>(),
-                            sec.at("LibName").get<std::string>(),
-                            sec.at("SectID").get<std::uint32_t>(),
-                            sec.at("PenSectID").get<std::uint32_t>());
-    }
+    return json.at("sections") | std::views::transform([](nlohmann::json const& sec) {
+             return ExforSection{
+                 .target      = sec.at("Targ").get<std::string>(),
+                 .a           = sec.at("AT").get<std::uint32_t>(),
+                 .lib_name    = sec.at("LibName").get<std::string>(),
+                 .sect_id     = sec.at("SectID").get<std::uint32_t>(),
+                 .pen_sect_id = sec.at("PenSectID").get<std::uint32_t>(),
+             };
+           })
+         | std::ranges::to<ExforSections>();
   } catch (nlohmann::json::exception const& e) {
     spdlog::error("parse_exfor_sections: {}", e.what());
     return std::unexpected(ExforParseError::wrong_type);
   }
-  return sections;
 }
 
 auto parse_cross_section(nlohmann::json const& json) -> std::expected<CrossSection, ExforParseError>
 {
-  CrossSection xsec;
   try {
-    for (auto const& point : json.at("datasets").at(0).at("pts")) {
-      xsec.push_back({
-          point.at("E").get<double>(), point.at("Sig").get<double>(),
-          point.value("dSig", 0.0), // not present in all datasets
-      });
-    }
+    return json.at("datasets").at(0).at("pts")
+         | std::views::transform([](nlohmann::json const& point) {
+             return CrossSectionPoint{
+                 .energy        = point.at("E").get<double>(),
+                 .cross_section = point.at("Sig").get<double>(),
+                 .d_sig         = point.value("dSig", 0.0) // not present in all datasets
+             };
+           })
+         | std::ranges::to<CrossSection>();
   } catch (nlohmann::json::exception const& e) {
     spdlog::error("parse_cross_section: {}", e.what());
     return std::unexpected(ExforParseError::wrong_type);
   }
-  return xsec;
 }
 
 } // namespace macs::detail
@@ -62,19 +66,28 @@ auto http_get(std::string const& url) -> cpr::Response
   return resp;
 }
 
-auto http_get_json(std::string const& url) -> std::expected<nlohmann::json, macs::ExforParseError>
+auto check_status(cpr::Response resp) -> std::expected<cpr::Response, macs::ExforParseError>
 {
-  auto resp = http_get(url);
   if (resp.status_code != HTTP_OK) {
     spdlog::error("HTTP {}", resp.status_code);
     return std::unexpected(macs::ExforParseError::network_error);
   }
+  return resp;
+}
+
+auto parse_body(cpr::Response const& resp) -> std::expected<nlohmann::json, macs::ExforParseError>
+{
   try {
     return nlohmann::json::parse(resp.text);
   } catch (nlohmann::json::exception const& e) {
     spdlog::error("invalid JSON — {}", e.what());
     return std::unexpected(macs::ExforParseError::wrong_type);
   }
+}
+
+auto http_get_json(std::string const& url) -> std::expected<nlohmann::json, macs::ExforParseError>
+{
+  return check_status(http_get(url)).and_then(parse_body);
 }
 // GCOV_EXCL_STOP
 
@@ -88,8 +101,9 @@ namespace macs {
     -> std::expected<ExforSections, ExforParseError>
 {
   return http_get_json(
-      std::format("https://www-nds.iaea.org/exfor/e4list?Target={}&Reaction={}&Quantity={}&json",
-                  target, reaction, quantity))
+             std::format(
+                 "https://www-nds.iaea.org/exfor/e4list?Target={}&Reaction={}&Quantity={}&json",
+                 target, reaction, quantity))
       .and_then(detail::parse_exfor_sections);
 }
 
@@ -97,9 +111,9 @@ namespace macs {
                                        std::string_view lib_name)
     -> std::expected<CrossSection, ExforParseError>
 {
-  auto find_section = [&](ExforSections const& sections) -> std::expected<ExforSection, ExforParseError> {
-    auto itr = std::ranges::find_if(sections,
-        [&](ExforSection const& sec) { return sec.lib_name == lib_name; });
+  auto find_section =
+      [&](ExforSections const& sections) -> std::expected<ExforSection, ExforParseError> {
+    auto itr = std::ranges::find(sections, lib_name, &ExforSection::lib_name);
     if (itr == sections.end()) {
       spdlog::error("library '{}' not found", lib_name);
       return std::unexpected(ExforParseError::missing_field);
@@ -109,14 +123,12 @@ namespace macs {
 
   auto fetch_xs = [](ExforSection const& sec) {
     return http_get_json(
-        std::format("https://www-nds.iaea.org/exfor/e4sig?SectID={}&PenSectID={}&json",
-                    sec.sect_id, sec.pen_sect_id))
+               std::format("https://www-nds.iaea.org/exfor/e4sig?SectID={}&PenSectID={}&json",
+                           sec.sect_id, sec.pen_sect_id))
         .and_then(detail::parse_cross_section);
   };
 
-  return fetch_exfor_sections(target, reaction, "SIG")
-      .and_then(find_section)
-      .and_then(fetch_xs);
+  return fetch_exfor_sections(target, reaction, "SIG").and_then(find_section).and_then(fetch_xs);
 }
 
 } // namespace macs
