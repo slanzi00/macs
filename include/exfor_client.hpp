@@ -1,9 +1,15 @@
 #ifndef MACS_EXFOR_CLIENT_HPP
 #define MACS_EXFOR_CLIENT_HPP
 
-namespace macs{
+#include <expected>
+#include <string>
+#include <vector>
 
-struct Section
+namespace macs {
+
+// @struct ExforSection
+// @brief Represents a section of an EXFOR entry.
+struct ExforSection
 {
   std::string target;        // "Targ"
   std::uint32_t z;           // "ZT"
@@ -22,17 +28,32 @@ struct Section
   std::string auth;          // "AUTH"
 };
 
-std::expected<std::vector<Section>, std::string>
-fetch_sections(std::string_view target, std::string_view reaction, std::string_view quantity);
+// @typedef ExforSections
+// @brief Represents a vector of ExforSection objects.
+using ExforSections = std::vector<ExforSection>;
 
-struct Library
+// @enum ExforParseError
+// @brief Represents an error that occurred while parsing an EXFOR entry.
+enum class ExforParseError : std::uint8_t
 {
-  std::uint32_t id;
-  std::string name;
+  missing_field,
+  wrong_type,
+  network_error
 };
 
-std::vector<Library> extract_libraries(std::vector<Section> const& sections);
+// @fn fetch_exfor_sections
+// @brief Fetches EXFOR sections for a given target, reaction, and quantity.
+// @param target The target element symbol.
+// @param reaction The reaction string.
+// @param quantity The quantity string.
+// @return A std::expected containing the ExforSections on success, or an ExforParseError on
+// failure.
+[[nodiscard]] auto fetch_exfor_sections(std::string_view target, std::string_view reaction,
+                                        std::string_view quantity)
+    -> std::expected<ExforSections, ExforParseError>;
 
+// @struct CrossSectionPoint
+// @brief Represents a point in a cross section dataset.
 struct CrossSectionPoint
 {
   double energy;        // "E" in eV
@@ -40,36 +61,35 @@ struct CrossSectionPoint
   double d_sig;         // "dSig" uncertainty in barn
 };
 
+// @using CrossSection
+// @brief Represents a cross section dataset as a vector of CrossSectionPoint.
+using CrossSection = std::vector<CrossSectionPoint>;
+
+// @struct CrossSectionDataset
+// @brief Represents a cross section dataset.
 struct CrossSectionDataset
 {
   std::string id;
-  std::string file;                      // "FILE"
-  std::string data_type;                 // "dataType"
-  std::string library;                   // "LIBRARY"
-  std::string target;                    // "TARGET"
-  double temp;                           // "TEMP"
-  std::uint32_t nsub;                    // "NSUB"
-  std::uint32_t mat;                     // "MAT"
-  std::uint32_t mf;                      // "MF"
-  std::uint32_t mt;                      // "MT"
-  std::string reaction;                  // "REACTION"
-  std::vector<std::string> columns;      // "COLUMNS"
-  std::string default_interpolation;     // "defaultInterpolation"
-  std::uint32_t n_pts;                   // "nPts"
-  std::vector<CrossSectionPoint> points; // "pts"
+  std::string file;                  // "FILE"
+  std::string data_type;             // "dataType"
+  std::string library;               // "LIBRARY"
+  std::string target;                // "TARGET"
+  double temp;                       // "TEMP"
+  std::uint32_t nsub;                // "NSUB"
+  std::uint32_t mat;                 // "MAT"
+  std::uint32_t mf;                  // "MF"
+  std::uint32_t mt;                  // "MT"
+  std::string reaction;              // "REACTION"
+  std::vector<std::string> columns;  // "COLUMNS"
+  std::string default_interpolation; // "defaultInterpolation"
+  std::uint32_t n_pts;               // "nPts"
+  CrossSection xsec;
 };
 
-struct CrossSectionResponse
-{
-  std::string format;
-  std::string now;
-  std::string program;
-  std::vector<CrossSectionDataset> datasets;
-};
-
-std::expected<CrossSectionResponse, std::string>
-fetch_cross_section(std::string_view target, std::string_view reaction, std::string_view lib_name);
+[[nodiscard]] auto fetch_cross_section(std::string_view target, std::string_view reaction,
+                                       std::string_view lib_name)
+    -> std::expected<CrossSectionDataset, ExforParseError>;
 
 } // namespace macs
 
-#endif
+#endif // MACS_EXFOR_CLIENT_HPP
