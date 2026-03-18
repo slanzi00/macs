@@ -87,39 +87,36 @@ namespace macs {
                                         std::string_view quantity)
     -> std::expected<ExforSections, ExforParseError>
 {
-  auto url =
+  return http_get_json(
       std::format("https://www-nds.iaea.org/exfor/e4list?Target={}&Reaction={}&Quantity={}&json",
-                  target, reaction, quantity);
-  auto json = http_get_json(url);
-  if (!json) {
-    return std::unexpected(json.error());
-  }
-  return detail::parse_exfor_sections(*json);
+                  target, reaction, quantity))
+      .and_then(detail::parse_exfor_sections);
 }
 
 [[nodiscard]] auto fetch_cross_section(std::string_view target, std::string_view reaction,
                                        std::string_view lib_name)
     -> std::expected<CrossSection, ExforParseError>
 {
-  auto sections = fetch_exfor_sections(target, reaction, "SIG");
-  if (!sections) {
-    return std::unexpected(sections.error());
-  }
+  auto find_section = [&](ExforSections const& sections) -> std::expected<ExforSection, ExforParseError> {
+    auto itr = std::ranges::find_if(sections,
+        [&](ExforSection const& sec) { return sec.lib_name == lib_name; });
+    if (itr == sections.end()) {
+      spdlog::error("library '{}' not found", lib_name);
+      return std::unexpected(ExforParseError::missing_field);
+    }
+    return *itr;
+  };
 
-  auto itr = std::ranges::find_if(
-      *sections, [&](ExforSection const& sec) { return sec.lib_name == lib_name; });
-  if (itr == sections->end()) {
-    spdlog::error("library '{}' not found", lib_name);
-    return std::unexpected(ExforParseError::missing_field);
-  }
+  auto fetch_xs = [](ExforSection const& sec) {
+    return http_get_json(
+        std::format("https://www-nds.iaea.org/exfor/e4sig?SectID={}&PenSectID={}&json",
+                    sec.sect_id, sec.pen_sect_id))
+        .and_then(detail::parse_cross_section);
+  };
 
-  auto url  = std::format("https://www-nds.iaea.org/exfor/e4sig?SectID={}&PenSectID={}&json",
-                          itr->sect_id, itr->pen_sect_id);
-  auto json = http_get_json(url);
-  if (!json) {
-    return std::unexpected(json.error());
-  }
-  return detail::parse_cross_section(*json);
+  return fetch_exfor_sections(target, reaction, "SIG")
+      .and_then(find_section)
+      .and_then(fetch_xs);
 }
 
 } // namespace macs
