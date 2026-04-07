@@ -86,7 +86,6 @@ if (MACS_COVERAGE)
       --gcov-executable ${MACS_GCOV_EXECUTABLE}
       --root ${PROJECT_SOURCE_DIR}
       --filter ${PROJECT_SOURCE_DIR}/src/
-      --filter ${PROJECT_SOURCE_DIR}/include/
       --exclude ${PROJECT_SOURCE_DIR}/src/main\\.cpp
       --exclude-directories ${PROJECT_BINARY_DIR}/vcpkg_installed
       --exclude-directories ${PROJECT_BINARY_DIR}/_deps
