@@ -3,6 +3,7 @@ add_library(macs exfor_client.cpp)
 add_executable(macs-run main.cpp)
 
 target_include_directories(macs PUBLIC
+  ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/src
 )
 
