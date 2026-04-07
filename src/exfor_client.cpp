@@ -1,11 +1,14 @@
 #include "exfor_client.hpp"
+#include "exfor_client_detail.hpp"
 
 #include <nlohmann/json.hpp>
 #include <cpr/cpr.h>
 #include <spdlog/spdlog.h>
 
 #include <format>
+#include <future>
 #include <ranges>
+#include <vector>
 
 namespace macs::detail {
 
@@ -129,6 +132,22 @@ namespace macs {
   };
 
   return fetch_exfor_sections(target, reaction, "SIG").and_then(find_section).and_then(fetch_xs);
+}
+
+[[nodiscard]] auto fetch_cross_sections(std::span<FetchRequest const> requests)
+    -> std::vector<FetchResult>
+{
+  auto futures = requests | std::views::transform([](FetchRequest const& req) {
+                   return std::async(std::launch::async, fetch_cross_section, req.target,
+                                     req.reaction, req.lib_name);
+                 })
+               | std::ranges::to<std::vector>();
+
+  return std::views::iota(std::size_t{}, requests.size())
+       | std::views::transform([&](std::size_t idx) -> FetchResult {
+           return FetchResult{.request = requests[idx], .data = futures[idx].get()};
+         })
+       | std::ranges::to<std::vector>();
 }
 
 } // namespace macs
